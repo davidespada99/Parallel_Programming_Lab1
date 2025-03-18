@@ -1,0 +1,12 @@
+A memory that describes:
+– the parallelization strategy,
+– the changes made to the code,
+– performance measurements: the acceleration (speed
+up) and efficiency obtained with respect to the original using different numbers of resources,
+– the performance analysis performed,
+– the problem(s) found, their importance and possible
+solutions,
+– In addition, the report will indicate in detail how the
+program should be compiled and executed.
+
+
