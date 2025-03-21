@@ -10,3 +10,12 @@ solutions,
 program should be compiled and executed.
 
 
+###########
+Davide
+
+1. added pragma omp for to feed_input() --> improvements
+2. added pragma omp for in forward_prop() to second for --> no improvements
+3. added pragma omp for in forward_prop() to third for--> no improvements
+###########
+
+

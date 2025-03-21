@@ -1,55 +1,63 @@
 /*
  *  training.c
  *
- *  Arxiu reutilitzat de l'assignatura de Computació d'Altes Prestacions de l'Escola d'Enginyeria de la Universitat Autònoma de Barcelona
- *  Created on: 31 gen. 2019
- *  Last modified: fall 24 (curs 24-25)
+ *  File reused from the High-Performance Computing course at the School of 
+ *  Engineering of the Autonomous University of Barcelona.
+ *  Created on: January 31, 2019
+ *  Last modified: Fall 2024 (academic year 24-25)
  *  Author: ecesar, asikora
- *  Modified: Blanca Llauradó, Christian Germer
+ *  Modified by: Blanca Llauradó, Christian Germer
  *
- *  Descripció:
- *  Funcions per entrenar la xarxa neuronal.
+ *  Description:
+ *  Functions for training the neural network.
  *
  */
+
 
 #include "training.h"
 
 #include <math.h>
 
 /**
- * @brief Iniciatlitza la capa incial de la xarxa (input layer) amb l'entrada
- * que volem reconeixer.
+ * @brief Initializes the initial layer of the network (input layer) 
+ * with the input we want to recognize.
  *
- * @param i Índex de l'element del conjunt d'entrenament que farem servir.
- **/
+ * @param i Index of the element from the training set that we will use.
+ */
+
 void feed_input(int i) {
+    #pragma omp parallel for // 1
     for (int j = 0; j < num_neurons[0]; j++)
         lay[0].actv[j] = input[i][j];
 }
 
 /**
- * @brief Propagació dels valors de les neurones de l'entrada (valors a la input
- * layer) a la resta de capes de la xarxa fins a obtenir una predicció (sortida)
+ * @brief Propagation of neuron values from the input layer to the rest of 
+ * the network layers until obtaining a prediction (output).
  *
- * @details La capa d'entrada (input layer = capa 0) ja ha estat inicialitzada
- * amb els valors de l'entrada que volem reconeixer. Així, el for més extern
- * (sobre i) recorre totes les capes de la xarxa a partir de la primera capa
- * hidden (capa 1). El for intern (sobre j) recorre les neurones de la capa i
- * calculant el seu valor d'activació [lay[i].actv[j]]. El valor d'activació de
- * cada neurona depén de l'exitació de la neurona calculada en el for més intern
- * (sobre k) [lay[i].z[j]]. El valor d'exitació s'inicialitza amb el biax de la
- * neurona corresponent [j] (lay[i].bias[j]) i es calcula multiplicant el valor
- * d'activació de les neurones de la capa anterior (i-1) pels pesos de
- * les connexions (out_weights) entre les dues capes. Finalment, el valor
- * d'activació de la neurona (j) es calcula fent servir la funció RELU
- * (REctified Linear Unit) si la capa (j) és una capa oculta (hidden) o la
- * funció Sigmoid si es tracte de la capa de sortida.
- *
+ * @details The input layer (layer 0) has already been initialized with the 
+ * input values that we want to recognize. Thus, the outer loop (over i) 
+ * iterates through all layers of the network starting from the first hidden 
+ * layer (layer 1). The inner loop (over j) iterates through the neurons 
+ * in layer i, calculating their activation values [lay[i].actv[j]]. The 
+ * activation value of each neuron depends on the excitation of the neuron 
+ * computed in the innermost loop (over k) [lay[i].z[j]]. The excitation 
+ * value is initialized with the bias of the corresponding neuron [j] 
+ * (lay[i].bias[j]) and is calculated by multiplying the activation values 
+ * of the neurons from the previous layer (i-1) by the weights of the 
+ * connections (out_weights) between the two layers. Finally, the activation 
+ * value of neuron (j) is computed using the RELU (Rectified Linear Unit) 
+ * function if (j) is a hidden layer, or the Sigmoid function if it is the 
+ * output layer.
  */
+
 void forward_prop() {
+    
     for (int i = 1; i < num_layers; i++) {
+        #pragma omp parallel for //2
         for (int j = 0; j < num_neurons[i]; j++) {
             lay[i].z[j] = lay[i].bias[j];
+            #pragma omp parallel for //3
             for (int k = 0; k < num_neurons[i - 1]; k++)
                 lay[i].z[j] +=
                     ((lay[i - 1].out_weights[j * num_neurons[i - 1] + k]) *
@@ -65,25 +73,24 @@ void forward_prop() {
 }
 
 /**
- * @brief Calcula el gradient que es necessari aplicar als pesos de les
- * connexions entre neurones per corregir els errors de predicció
+ * @brief Calculates the gradient that needs to be applied to the weights of the
+ * connections between neurons to correct prediction errors.
  *
- * @details Calcula dos vectors de correcció per cada capa de la xarxa, un per
- * corregir els pesos de les connexions de la neurona (j) amb la capa anterior
- *          (lay[i-1].dw[j]) i un segon per corregir el biax de cada neurona de
- * la capa actual (lay[i].bias[j]). Hi ha un tractament diferent per la capa de
- * sortida (num_layesr -1) perquè aquest és l'única cas en el que l'error es
- * conegut (lay[num_layers-1].actv[j] - desired_outputs[p][j]). Això es pot
- * veure en els dos primers fors. Per totes les capes ocultes (hidden layers) no
- * es pot saber el valor d'activació esperat per a cada neurona i per tant es fa
- * una estimació. Aquest càlcul es fa en el doble for que recorre totes les
- * capes ocultes (sobre i) neurona a neurona (sobre j). Es pot veure com en cada
- * cas es fa una estimació de quines hauríen de ser les activacions de les
- * neurones de la capa anterior (lay[i-1].dactv[k] = lay[i-1].out_weights[j*
- * num_neurons[i-1] + k] * lay[i].dz[j];), excepte pel cas de la capa d'entrada
- * (input layer) que és coneguda (imatge d'entrada).
+ * @details It calculates two correction vectors for each layer of the network: one to
+ * correct the weights of the connections from neuron (j) to the previous layer
+ * (lay[i-1].dw[j]), and a second to correct the bias of each neuron in the current layer
+ * (lay[i].bias[j]). There is a different treatment for the output layer (num_layers -1)
+ * because this is the only case where the error is known 
+ * (lay[num_layers-1].actv[j] - desired_outputs[p][j]). This can be seen in the first two loops.
+ * For all hidden layers, the expected activation value of each neuron cannot be known, 
+ * so an estimation is made. This calculation is performed in the nested loops that iterate 
+ * through all the hidden layers (over i) and neuron by neuron (over j). It can be seen 
+ * that for each case, an estimation of the activations of the neurons in the previous layer 
+ * is made (lay[i-1].dactv[k] = lay[i-1].out_weights[j * num_neurons[i-1] + k] * lay[i].dz[j];),
+ * except for the input layer (input layer) which is known (input image).
  *
  */
+
 void back_prop(int p) {
     // Output Layer
     for (int j = 0; j < num_neurons[num_layers - 1]; j++) {
@@ -124,12 +131,12 @@ void back_prop(int p) {
 }
 
 /**
- * @brief Actualitza els vectors de pesos (out_weights) i de biax (bias) de cada
- * etapa d'acord amb els càlculs fet a la funció de back_prop i el factor
- * d'aprenentatge alpha
+ * @brief Updates the weight vectors (out_weights) and bias vectors (bias) of each layer
+ * according to the calculations made in the back_prop function and the learning rate alpha.
  *
  * @see back_prop
  */
+
 void update_weights(void) {
     for (int i = 0; i < num_layers - 1; i++) {
         for (int j = 0; j < num_neurons[i + 1]; j++)
